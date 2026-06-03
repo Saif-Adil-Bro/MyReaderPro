@@ -30,6 +30,9 @@ jobs:
     - name: Grant Execute Permission to Gradlew
       run: chmod +x gradlew
 
+    - name: Decode Keystore
+      run: base64 --decode debug.keystore.base64 > debug.keystore
+
     - name: Build with Gradle
       run: gradle assembleDebug
 
