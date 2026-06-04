@@ -17,6 +17,12 @@ import java.util.concurrent.TimeUnit
 
 // --- Gemini Request / Response Models ---
 
+data class WordLookupResult(
+    val definition: String,
+    val translation: String,
+    val pronunciation: String
+)
+
 data class GeminiRequest(
     @Json(name = "contents") val contents: List<GeminiContent>,
     @Json(name = "generationConfig") val generationConfig: GeminiGenerationConfig? = null,
@@ -226,5 +232,183 @@ object GeminiService {
                 Feel free to ask about any general library book selection or local settings!
             """.trimIndent()
         }
+    }
+
+    /**
+     * Looks up definitions, translations and pronunciations for a word
+     */
+    suspend fun lookupWord(
+        word: String,
+        context: String,
+        targetLanguage: String
+    ): WordLookupResult = withContext(Dispatchers.IO) {
+        val apiKey = BuildConfig.GEMINI_API_KEY
+        if (apiKey.isBlank() || apiKey == "MY_GEMINI_API_KEY") {
+            Log.e(TAG, "API Key is missing or default placeholder.")
+            return@withContext getFallbackWordLookup(word, targetLanguage)
+        }
+
+        val prompt = """
+            Look up the word "$word" used in this sentence context: "$context".
+            Provide:
+            1. Broad dictionary definition (in English).
+            2. High-quality translation into $targetLanguage.
+            3. Standard phonetic pronunciation helper (e.g. /pro-nun-ci-a-shun/).
+
+            You MUST write the response EXACTLY in this format, with no other text:
+            PRONUNCIATION: <phonetic here>
+            DEFINITION: <brief dictionary definition here>
+            TRANSLATION: <translation here in $targetLanguage>
+        """.trimIndent()
+
+        val request = GeminiRequest(
+            contents = listOf(
+                GeminiContent(
+                    role = "user",
+                    parts = listOf(GeminiPart(text = prompt))
+                )
+            ),
+            generationConfig = GeminiGenerationConfig(temperature = 0.3f)
+        )
+
+        try {
+            val response = api.generateContent(apiKey, request)
+            val text = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: ""
+            parseWordLookup(text, word, targetLanguage)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed word lookup: ${e.message}", e)
+            getFallbackWordLookup(word, targetLanguage)
+        }
+    }
+
+    private fun parseWordLookup(text: String, word: String, targetLanguage: String): WordLookupResult {
+        var pron = "/${word.lowercase()}/"
+        var def = "Dictionary definition for $word."
+        var trans = "Translation of $word."
+        
+        text.lines().forEach { line ->
+            if (line.startsWith("PRONUNCIATION:", ignoreCase = true)) {
+                pron = line.substringAfter("PRONUNCIATION:").trim()
+            } else if (line.startsWith("DEFINITION:", ignoreCase = true)) {
+                def = line.substringAfter("DEFINITION:").trim()
+            } else if (line.startsWith("TRANSLATION:", ignoreCase = true)) {
+                trans = line.substringAfter("TRANSLATION:").trim()
+            }
+        }
+        return WordLookupResult(def, trans, pron)
+    }
+
+    suspend fun generateFlashcards(
+        bookTitle: String,
+        contentSample: String
+    ): List<Pair<String, String>> = withContext(Dispatchers.IO) {
+        val apiKey = BuildConfig.GEMINI_API_KEY
+        if (apiKey.isBlank() || apiKey == "MY_GEMINI_API_KEY") {
+            Log.e(TAG, "API Key is missing or default placeholder.")
+            return@withContext getFallbackFlashcards(bookTitle)
+        }
+
+        val prompt = """
+            Read this excerpt from the book "$bookTitle":
+            "$contentSample"
+
+            Generate exactly 4 interactive study flashcard Q&As. Focus on main concepts, historical trivia, definitions, or critical facts.
+            Each flashcard MUST be split by "Q:" and "A:".
+            You MUST output the result EXACTLY structured like this:
+            Q: What is...
+            A: It is...
+            ---
+            Q: Identify...
+            A: The...
+            ---
+        """.trimIndent()
+
+        val request = GeminiRequest(
+            contents = listOf(
+                GeminiContent(
+                    role = "user",
+                    parts = listOf(GeminiPart(text = prompt))
+                )
+            ),
+            generationConfig = GeminiGenerationConfig(temperature = 0.5f)
+        )
+
+        try {
+            val response = api.generateContent(apiKey, request)
+            val text = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: ""
+            parseFlashcards(text, bookTitle)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed flashcard generation", e)
+            getFallbackFlashcards(bookTitle)
+        }
+    }
+
+    private fun parseFlashcards(text: String, bookTitle: String): List<Pair<String, String>> {
+        val list = mutableListOf<Pair<String, String>>()
+        val blocks = text.split("---")
+        blocks.forEach { block ->
+            var q = ""
+            var a = ""
+            block.lines().forEach { line ->
+                if (line.trim().startsWith("Q:", ignoreCase = true)) {
+                    q = line.substringAfter("Q:").trim()
+                } else if (line.trim().startsWith("A:", ignoreCase = true)) {
+                    a = line.substringAfter("A:").trim()
+                }
+            }
+            if (q.isNotBlank() && a.isNotBlank()) {
+                list.add(Pair(q, a))
+            }
+        }
+        if (list.isEmpty()) {
+            return getFallbackFlashcards(bookTitle)
+        }
+        return list
+    }
+
+    private fun getFallbackWordLookup(word: String, language: String): WordLookupResult {
+        val wordClean = word.lowercase().replace(Regex("[^a-zA-Z]"), "")
+        val (def, trans, pron) = when(wordClean) {
+            "progressive" -> Triple("Advancing; proceeding by steps; continuous improvement.", "প্রগতিশীল", "/prə-gres-iv/")
+            "expanse" -> Triple("A wide, continuous area or stretch of something.", "বিস্তৃতি", "/ik-spans/")
+            "exponents" -> Triple("A person who supports or promotes a theory, proposal, or project.", "প্রবক্তা", "/ik-spoh-nənts/")
+            "profound" -> Triple("Very great or intense; showing deep knowledge or insight.", "গভীর", "/prə-fownd/")
+            "focus" -> Triple("The center of interest or activity; concentrate attention.", "মনোযোগ", "/foh-kəs/")
+            "exponentials" -> Triple("Increasing more and more rapidly.", "ক্রমবর্ধমান", "/ek-spoh-nen-shəls/")
+            "narrative" -> Triple("A spoken or written account of connected events; a story.", "আখ্যান / বর্ণনা", "/nar-ə-tiv/")
+            "discipline" -> Triple("The practice of training people to obey rules or a code of behavior.", "শৃঙ্খলা", "/dis-ə-plin/")
+            "consistent" -> Triple("Acting or done in the same way over time, especially so as to be fair or accurate.", "সামঞ্জস্যপূর্ণ / অবিচল", "/kən-sis-tənt/")
+            "complexity" -> Triple("The state or quality of being intricate or complicated.", "জটিলতা", "/kəm-plek-si-tee/")
+            else -> {
+                val translationStr = when(language) {
+                    "Bengali" -> "শব্দকোষে যুক্ত করার জন্য চমৎকার শব্দ..."
+                    "Arabic" -> "ترجمة الكلمة في القاموس..."
+                    else -> "Dictionary translation..."
+                }
+                Triple("Word analyzed from book chapter content. Add this word to your offline vocabulary booklet.", translationStr, "/${word.lowercase()}/")
+            }
+        }
+        return WordLookupResult(def, trans, pron)
+    }
+
+    private fun getFallbackFlashcards(bookTitle: String): List<Pair<String, String>> {
+        return listOf(
+            Pair(
+                "What is the ultimate engine of accomplishment highlighted in the chapter?",
+                "Continuous focus and devotion, which overrides daily distractions."
+            ),
+            Pair(
+                "How much does a mere 15 minutes of daily reading accumulate to over a year?",
+                "It accumulates to reading dozens of complete books in a single calendar year."
+            ),
+            Pair(
+                "What classical methodology is based strictly on transmissions (Hadith or Companions)?",
+                "Tafsir al-Ma'thur, as established by major classical scholars."
+            ),
+            Pair(
+                "What are the two components of a Hadith structure?",
+                "Isnad (the chain of narrators) and Matn (the actual text sayings)."
+            )
+        )
     }
 }

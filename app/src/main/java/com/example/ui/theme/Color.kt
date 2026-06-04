@@ -8,13 +8,13 @@ val TealDark = Color(0xFF0D5E58)
 val TealLight = Color(0xFF14B8A6)
 val OrangeAccent = Color(0xFFF59E0B)
 
-val CharcoalBg = Color(0xFF121817)
-val CardDark = Color(0xFF1B2423)
-val TextLight = Color(0xFFF3F4F6)
+val CharcoalBg = Color(0xFF0F172A)
+val CardDark = Color(0xFF1E293B)
+val TextLight = Color(0xFFF8FAFC)
 
-val LightBg = Color(0xFFFBFDFF)
-val CardLight = Color(0xFFF3F4F6)
-val TextDark = Color(0xFF1F2937)
+val LightBg = Color(0xFFF8F9FA)
+val CardLight = Color(0xFFFFFFFF)
+val TextDark = Color(0xFF0F172A)
 
 // Sepia Reader Mode
 val SepiaBg = Color(0xFFF4ECD8)

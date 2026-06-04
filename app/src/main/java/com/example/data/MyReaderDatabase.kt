@@ -21,9 +21,13 @@ import kotlinx.coroutines.launch
         NotificationEntity::class,
         BookRequestEntity::class,
         CopyrightClaimEntity::class,
-        AdBlockEntity::class
+        AdBlockEntity::class,
+        PostEntity::class,
+        CommentEntity::class,
+        WordEntity::class,
+        FlashcardEntity::class
     ],
-    version = 2,
+    version = 6,
     exportSchema = false
 )
 abstract class MyReaderDatabase : RoomDatabase() {
@@ -188,7 +192,8 @@ abstract class MyReaderDatabase : RoomDatabase() {
                     rating = 4.9f,
                     downloads = 4850,
                     isFeatured = true,
-                    contentMarkdown = dummyContentHadith
+                    contentMarkdown = dummyContentHadith,
+                    fileFormat = "EPUB"
                 ),
                 BookEntity(
                     id = "b2",
@@ -202,7 +207,8 @@ abstract class MyReaderDatabase : RoomDatabase() {
                     rating = 4.9f,
                     downloads = 9320,
                     isFeatured = true,
-                    contentMarkdown = dummyContentQuran
+                    contentMarkdown = dummyContentQuran,
+                    fileFormat = "PDF"
                 ),
                 BookEntity(
                     id = "b3",
@@ -216,7 +222,8 @@ abstract class MyReaderDatabase : RoomDatabase() {
                     rating = 5.0f,
                     downloads = 15400,
                     isFeatured = false,
-                    contentMarkdown = dummyContentHadith
+                    contentMarkdown = dummyContentHadith,
+                    fileFormat = "ARTICLE"
                 ),
                 BookEntity(
                     id = "b4",
@@ -230,7 +237,8 @@ abstract class MyReaderDatabase : RoomDatabase() {
                     rating = 4.6f,
                     downloads = 6320,
                     isFeatured = false,
-                    contentMarkdown = dummyContentGeneral
+                    contentMarkdown = dummyContentGeneral,
+                    fileFormat = "EPUB"
                 ),
                 BookEntity(
                     id = "b5",
@@ -244,7 +252,8 @@ abstract class MyReaderDatabase : RoomDatabase() {
                     rating = 4.7f,
                     downloads = 2100,
                     isFeatured = false,
-                    contentMarkdown = dummyContentGeneral
+                    contentMarkdown = dummyContentGeneral,
+                    fileFormat = "PDF"
                 ),
                 BookEntity(
                     id = "b6",
@@ -258,7 +267,8 @@ abstract class MyReaderDatabase : RoomDatabase() {
                     rating = 4.9f,
                     downloads = 12500,
                     isFeatured = true,
-                    contentMarkdown = dummyContentGeneral
+                    contentMarkdown = dummyContentGeneral,
+                    fileFormat = "ARTICLE"
                 ),
                 BookEntity(
                     id = "b7",
@@ -272,7 +282,8 @@ abstract class MyReaderDatabase : RoomDatabase() {
                     rating = 4.8f,
                     downloads = 8900,
                     isFeatured = false,
-                    contentMarkdown = dummyContentGeneral
+                    contentMarkdown = dummyContentGeneral,
+                    fileFormat = "EPUB"
                 ),
                 BookEntity(
                     id = "b8",
@@ -286,7 +297,8 @@ abstract class MyReaderDatabase : RoomDatabase() {
                     rating = 4.7f,
                     downloads = 7600,
                     isFeatured = false,
-                    contentMarkdown = dummyContentGeneral
+                    contentMarkdown = dummyContentGeneral,
+                    fileFormat = "PDF"
                 )
             )
             dao.insertBooks(books)
@@ -371,6 +383,123 @@ abstract class MyReaderDatabase : RoomDatabase() {
                     imageUrl = "banner_monetization_interstitial",
                     clicks = 18,
                     impressions = 412
+                )
+            )
+
+            // Seed Forum Posts
+            dao.insertPost(
+                PostEntity(
+                    id = 1,
+                    title = "Welcome to MyReaderPro Social Hub! 🚀",
+                    content = "Hey everyone! Welcome to our new integrated community space. Here you can write posts, ask questions, exchange notes, share tips, and discuss your reading journeys with other book enthusiasts worldwide. Explore other sections or create your very first book discussion directly inside the forum tab. Happy reading!",
+                    type = "ANNOUNCEMENT",
+                    authorName = "MyReader Admin Team",
+                    authorEmail = "admin@myreaderpro.com",
+                    authorAvatar = "avatar_1",
+                    imageUrl = "",
+                    bookTitleRef = "",
+                    likesCount = 24,
+                    commentsCount = 2,
+                    timestamp = System.currentTimeMillis() - 7200000,
+                    isLiked = true,
+                    isSaved = false
+                )
+            )
+
+            dao.insertPost(
+                PostEntity(
+                    id = 2,
+                    title = "Tips on building a consistent morning reading habit 🌅",
+                    content = "Consistency is much more powerful than volume. Reading just 10 pages over morning coffee adds up to more than 3,600 pages a year—that's roughly 12 full-sized books! Here are three fast tips: 1. Keep your current read next to your coffee maker, 2. Put your phone in another room until you read those 10 pages, 3. Focus on a high-interest genre to begin with.",
+                    type = "TIPS",
+                    authorName = "Sofia Rahman",
+                    authorEmail = "sofia.r@gmail.com",
+                    authorAvatar = "avatar_default",
+                    imageUrl = "",
+                    bookTitleRef = "",
+                    likesCount = 18,
+                    commentsCount = 1,
+                    timestamp = System.currentTimeMillis() - 3600000,
+                    isLiked = false,
+                    isSaved = true
+                )
+            )
+
+            dao.insertPost(
+                PostEntity(
+                    id = 3,
+                    title = "Cosmos by Carl Sagan: Absolute Masterpiece or Too Dated?",
+                    content = "Just started reading Carl Sagan's 'Cosmos' in MyReader. I'm absolutely blown away by his prose. It reads almost like poetry. He manages to connect history, physics, biological evolution, and chemistry in a singular narrative. Some scientific findings are updated now, but the philosophical impact remains completely untouched. What are your thoughts on chapter 2, 'One Voice in the Cosmic Fugue'?",
+                    type = "DISCUSSION",
+                    authorName = "Dr. Imran Karim",
+                    authorEmail = "imran.kd@yahoo.com",
+                    authorAvatar = "avatar_2",
+                    imageUrl = "",
+                    bookTitleRef = "Cosmos",
+                    likesCount = 35,
+                    commentsCount = 3,
+                    timestamp = System.currentTimeMillis() - 1800000,
+                    isLiked = false,
+                    isSaved = false
+                )
+            )
+
+            // Seed Comments for Post 3
+            dao.insertComment(
+                CommentEntity(
+                    id = 1,
+                    postId = 3,
+                    authorName = "Nabil Chowdhury",
+                    authorEmail = "nabil.chow@gmail.com",
+                    authorAvatar = "avatar_3",
+                    text = "I absolutely agree! Sagan's call for cosmic humility and perspective is something that never goes out of style. It transcends decades.",
+                    timestamp = System.currentTimeMillis() - 1200000
+                )
+            )
+            dao.insertComment(
+                CommentEntity(
+                    id = 2,
+                    postId = 3,
+                    authorName = "Aisha Khan",
+                    authorEmail = "aisha.read@gmail.com",
+                    authorAvatar = "avatar_4",
+                    text = "Yes, Chapter 2 is spectacular. His explanation of artificial selection via Heike crabs is one of my favorite science explanations ever written!",
+                    timestamp = System.currentTimeMillis() - 900000
+                )
+            )
+            dao.insertComment(
+                CommentEntity(
+                    id = 3,
+                    postId = 3,
+                    authorName = "Sofia Rahman",
+                    authorEmail = "sofia.r@gmail.com",
+                    authorAvatar = "avatar_default",
+                    text = "It's what inspired me to study astrobiology! I read it when I was in high school and it changed my life path completely.",
+                    timestamp = System.currentTimeMillis() - 600000
+                )
+            )
+
+            // Seed Comment for Post 1
+            dao.insertComment(
+                CommentEntity(
+                    id = 4,
+                    postId = 1,
+                    authorName = "Dr. Imran Karim",
+                    authorEmail = "imran.kd@yahoo.com",
+                    authorAvatar = "avatar_2",
+                    text = "This is brilliant! Having the community forum right inside our daily e-reader app is exactly what my book club was looking for.",
+                    timestamp = System.currentTimeMillis() - 500000
+                )
+            )
+            dao.insertComment(
+                CommentEntity(
+                    id = 5,
+                    postId = 1,
+                    authorName = "Aisha Khan",
+                    authorEmail = "aisha.read@gmail.com",
+                    authorAvatar = "avatar_4",
+                    text = "Love the design and layout of the posts! Super clean and intuitive.",
+                    timestamp = System.currentTimeMillis() - 300000
                 )
             )
         }

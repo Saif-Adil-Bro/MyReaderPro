@@ -39,8 +39,13 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     val favoriteBooks = repository.favoriteBooks
     val downloadedBooks = repository.downloadedBooks
     val readingHistoryBooks = repository.readingHistoryBooks
+    val rawReadingHistory = repository.rawReadingHistory
     val achievements = repository.achievements
     val notifications = repository.notifications
+    val allPosts = repository.allPosts
+    val savedPosts = repository.savedPosts
+    val allBookmarks = repository.allBookmarks
+    val allNotes = repository.allNotes
 
     // Selected book for detail & active reader instance
     private val _selectedBookId = MutableStateFlow<String?>(null)
@@ -75,6 +80,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     var readerLineSpacing by mutableStateOf(1.4f) // multiple
     var readerMargin by mutableStateOf(16f) // dp
     var readerFontFamily by mutableStateOf("Serif") // Serif, Sans-Serif, Monospace
+    var readerBrightness by mutableStateOf(1.0f) // 0.1f to 1.0f
 
     // Search query
     private val _searchQuery = MutableStateFlow("")
@@ -93,6 +99,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
 
     // Admin state simulations
     var showAdminPanel by mutableStateOf(false)
+    var showNotificationCenter by mutableStateOf(false)
 
     // Navigation state helper (for simple app states backstack inside main flow)
     var currentScreen by mutableStateOf("splash") // splash, onboarding, login, main, details, reader
@@ -145,9 +152,10 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
                 "featured" -> "নির্বাচিত বই"
                 "continue_reading" -> "পড়া চালিয়ে যান"
                 "categories" -> "ক্যাটাগরি"
-                "library" -> "লাইব্রেরি"
+                "library" -> "বই"
                 "profile" -> "প্রোফাইল"
-                "stats" -> "পরিসংখ্যান"
+                "stats" -> "বিশ্লেষণ"
+                "forum" -> "ব্যবহারকারী"
                 "achievements" -> "অর্জনসমূহ"
                 "download" -> "ডাউনলোড"
                 "downloaded" -> "ডাউনলোড সম্পন্ন"
@@ -180,9 +188,10 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
                 "featured" -> "الكتب المميزة"
                 "continue_reading" -> "مواصلة القراءة"
                 "categories" -> "الأقسام"
-                "library" -> "المكتبة"
+                "library" -> "الكتب"
                 "profile" -> "الملف الشخصي"
-                "stats" -> "الإحصائيات"
+                "stats" -> "التحليلات"
+                "forum" -> "الأعضاء"
                 "achievements" -> "الإنجازات"
                 "download" -> "تحميل"
                 "downloaded" -> "تم التنزيل"
@@ -215,9 +224,10 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
                 "featured" -> "Featured Books"
                 "continue_reading" -> "Continue Reading"
                 "categories" -> "Categories"
-                "library" -> "My Library"
+                "library" -> "Books"
+                "forum" -> "Users"
                 "profile" -> "Profile"
-                "stats" -> "Statistics"
+                "stats" -> "Analytics"
                 "achievements" -> "Achievements"
                 "download" -> "Download"
                 "downloaded" -> "Downloaded"
@@ -313,11 +323,11 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun handleGoogleLogin(email: String, name: String, onSuccess: () -> Unit = {}) {
+    fun handleGoogleLogin(email: String, name: String, idToken: String? = null, onSuccess: () -> Unit = {}) {
         viewModelScope.launch {
             authLoading = true
             authError = null
-            val result = repository.loginGoogleWithFirebase(email, name)
+            val result = repository.loginGoogleWithFirebase(email, name, idToken)
             authLoading = false
             result.fold(
                 onSuccess = {
@@ -352,6 +362,20 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
 
     fun handleLogout() {
         viewModelScope.launch {
+            try {
+                com.google.firebase.auth.FirebaseAuth.getInstance().signOut()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            try {
+                val gso = com.google.android.gms.auth.api.signin.GoogleSignInOptions.Builder(
+                    com.google.android.gms.auth.api.signin.GoogleSignInOptions.DEFAULT_SIGN_IN
+                ).build()
+                val client = com.google.android.gms.auth.api.signin.GoogleSignIn.getClient(getApplication(), gso)
+                client.signOut()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
             repository.logoutUser()
             currentScreen = "login"
         }
@@ -440,6 +464,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
                 rating = 4.5f,
                 downloads = 0,
                 isFeatured = true,
+                fileFormat = listOf("EPUB", "PDF", "ARTICLE").random(),
                 contentMarkdown = """
                     # Chapter 1: $title Introduction
                     This is a custom book published instantly via the live admin web emulation portal.
@@ -624,6 +649,159 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // Community Forum Social Actions
+    fun createPost(title: String, content: String, type: String, bookTitleRef: String = "", imageUrl: String = "") {
+        viewModelScope.launch {
+            val user = repository.activeUser.firstOrNull() ?: UserEntity(
+                email = "guest@myreader.com",
+                name = "Library Guest",
+                isGuest = true
+            )
+            val post = PostEntity(
+                title = title,
+                content = content,
+                type = type,
+                authorName = user.name,
+                authorEmail = user.email,
+                authorAvatar = user.profilePicture,
+                bookTitleRef = bookTitleRef,
+                imageUrl = imageUrl
+            )
+            repository.insertPost(post)
+
+            // Broadcast a local notification for community activity to make the system feel alive
+            val db = MyReaderDatabase.getDatabase(getApplication(), viewModelScope)
+            db.readerDao().insertNotification(
+                NotificationEntity(
+                    title = "New Forum Post",
+                    message = "${user.name} published: \"$title\" in the community hubs."
+                )
+            )
+        }
+    }
+
+    fun toggleLikePost(postId: Int) {
+        viewModelScope.launch {
+            repository.toggleLikePost(postId)
+        }
+    }
+
+    fun toggleSavePost(postId: Int) {
+        viewModelScope.launch {
+            repository.toggleSavePost(postId)
+        }
+    }
+
+    fun reportPost(postId: Int) {
+        viewModelScope.launch {
+            repository.reportPost(postId)
+        }
+    }
+
+    fun getCommentsForPost(postId: Int): Flow<List<CommentEntity>> {
+        return repository.getCommentsForPost(postId)
+    }
+
+    fun addComment(postId: Int, text: String, parentCommentId: Int = -1) {
+        viewModelScope.launch {
+            val user = repository.activeUser.firstOrNull() ?: UserEntity(
+                email = "guest@myreader.com",
+                name = "Library Guest",
+                isGuest = true
+            )
+            val comment = CommentEntity(
+                postId = postId,
+                authorName = user.name,
+                authorEmail = user.email,
+                authorAvatar = user.profilePicture,
+                text = text,
+                parentCommentId = parentCommentId
+            )
+            repository.insertComment(comment)
+        }
+    }
+
+    fun deletePost(post: PostEntity) {
+        viewModelScope.launch {
+            repository.deletePost(post)
+        }
+    }
+
+    fun deleteComment(comment: CommentEntity) {
+        viewModelScope.launch {
+            repository.deleteComment(comment)
+        }
+    }
+
+    // Interactive Notification Actions
+    fun markNotificationAsRead(id: Int) {
+        viewModelScope.launch {
+            repository.markNotificationAsRead(id)
+        }
+    }
+
+    fun markAllNotificationsAsRead(notificationsList: List<NotificationEntity>) {
+        viewModelScope.launch {
+            repository.markAllNotificationsAsRead(notificationsList)
+        }
+    }
+
+    fun markAllNotificationsAsRead() {
+        viewModelScope.launch {
+            repository.markAllNotificationsAsRead(emptyList())
+        }
+    }
+
+    fun triggerMockNotification(type: String) {
+        viewModelScope.launch {
+            val databaseInstance = MyReaderDatabase.getDatabase(getApplication(), viewModelScope)
+            val notif = when (type) {
+                "NEW_BOOK" -> NotificationEntity(
+                    title = "New Book In Library! 📚",
+                    message = "We've added 'The Silent Patient' to the Novels section. Download now for weekend reading!",
+                    type = "NEW_BOOK"
+                )
+                "BOOK_APPROVAL" -> NotificationEntity(
+                    title = "Book Suggestion Approved! 🎉",
+                    message = "Your submission 'Atomic Habits' was reviewed and published to the self development archive.",
+                    type = "BOOK_APPROVAL"
+                )
+                "SUBMISSION_UPDATE" -> NotificationEntity(
+                    title = "Submission Updated 📁",
+                    message = "Your requested manuscript 'Fiqh of Worship' has been successfully reviewed by catalog admins.",
+                    type = "SUBMISSION_UPDATE"
+                )
+                "LIKE" -> NotificationEntity(
+                    title = "New Like on Forum! ❤️",
+                    message = "Aisha Khan liked your discussion post regarding 'The Prophet's Character'.",
+                    type = "LIKE"
+                )
+                "COMMENT" -> NotificationEntity(
+                    title = "New Comment Received 💬",
+                    message = "Sofia Rahman left a comment on your book review: 'A brilliant exploration!'",
+                    type = "COMMENT"
+                )
+                "REPLY" -> NotificationEntity(
+                    title = "Interactive Reply ↩️",
+                    message = "Dr. Imran Karim replied to your comment on the morning reading tips thread.",
+                    type = "REPLY"
+                )
+                "ADMIN" -> NotificationEntity(
+                    title = "Admin Broadcast 📢",
+                    message = "Scheduled server upgrade starting at 02:00 AM UTC. Some offline caches might refresh.",
+                    type = "ADMIN"
+                )
+                else -> NotificationEntity(
+                    title = "System Alert ⚡",
+                    message = "Cloud backup sync successfully completed. 28 KB of notes exported.",
+                    type = "SYSTEM"
+                )
+            }
+            databaseInstance.readerDao().insertNotification(notif)
+        }
+    }
+
+
     // --- Gemini Book Summary State ---
     var bookSummaryLoading by mutableStateOf(false)
     var bookSummaryText by mutableStateOf<String?>(null)
@@ -690,5 +868,110 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
             else -> "Hello! I'm your literary research partner. Ask me design aspects, history, key insights or book recommendations!"
         }
         chatMessages.add("model" to welcome)
+    }
+
+    // --- Interactive Wordbook & AI Dictionary Lookup ---
+    val allWords = repository.allWords
+
+    var aiLookupLoading by mutableStateOf(false)
+    var activeWordLookupResult by mutableStateOf<WordLookupResult?>(null)
+
+    fun saveWord(word: String, definition: String, translation: String, pronunciation: String, bookTitle: String, sentenceContext: String) {
+        viewModelScope.launch {
+            repository.saveWord(
+                WordEntity(
+                    word = word,
+                    definition = definition,
+                    translation = translation,
+                    pronunciation = pronunciation,
+                    bookTitle = bookTitle,
+                    sentenceContext = sentenceContext
+                )
+            )
+        }
+    }
+
+    fun deleteWord(word: WordEntity) {
+        viewModelScope.launch {
+            repository.deleteWord(word)
+        }
+    }
+
+    fun performAILookup(word: String, sentenceContext: String) {
+        viewModelScope.launch {
+            aiLookupLoading = true
+            activeWordLookupResult = null
+            try {
+                activeWordLookupResult = GeminiService.lookupWord(word, sentenceContext, currentLanguage)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                aiLookupLoading = false
+            }
+        }
+    }
+
+    // --- AI Flashcard Generator & Memorizer ---
+    var aiFlashcardLoading by mutableStateOf(false)
+    
+    val selectedBookFlashcards: Flow<List<FlashcardEntity>> = _selectedBookId
+        .flatMapLatest { id ->
+            if (id != null) repository.getFlashcardsForBook(id) else flowOf(emptyList())
+        }
+
+    fun generateAIFlashcards(bookTitle: String, contentSample: String) {
+        val bookId = selectedBookId ?: return
+        viewModelScope.launch {
+            aiFlashcardLoading = true
+            try {
+                val cards = GeminiService.generateFlashcards(bookTitle, contentSample)
+                cards.forEach { (q, a) ->
+                    repository.saveFlashcard(
+                        FlashcardEntity(
+                            bookId = bookId,
+                            question = q,
+                            answer = a
+                        )
+                    )
+                }
+                // Send automated notification of success
+                database.readerDao().insertNotification(
+                    NotificationEntity(
+                        title = "Flashcards Ready! 🧠📖",
+                        message = "AI successfully analyzed high-yield sections and generated custom interactive study cards for '$bookTitle'."
+                    )
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                aiFlashcardLoading = false
+            }
+        }
+    }
+
+    fun deleteFlashcard(flashcard: FlashcardEntity) {
+        viewModelScope.launch {
+            repository.deleteFlashcard(flashcard)
+        }
+    }
+
+    fun clearFlashcardsForBook() {
+        val bookId = selectedBookId ?: return
+        viewModelScope.launch {
+            repository.clearFlashcardsForBook(bookId)
+        }
+    }
+
+    // --- Gamified Daily Reading Goals & Milestones Progress ---
+    fun updateDailyReadingGoal(minutes: Int) {
+        viewModelScope.launch {
+            repository.updateUserGoal(minutes)
+        }
+    }
+
+    fun updateReadingTime(seconds: Int) {
+        viewModelScope.launch {
+            repository.addReadingTimeSeconds(seconds)
+        }
     }
 }

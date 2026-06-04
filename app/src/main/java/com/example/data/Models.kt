@@ -18,7 +18,9 @@ data class UserEntity(
     val isSupporter: Boolean = true,
     val totalDonationAmount: Float = 25.0f,
     val role: String = "USER", // USER, MODERATOR, ADMIN
-    val isLoggedIn: Boolean = false
+    val isLoggedIn: Boolean = false,
+    val dailyReadingGoalMinutes: Int = 30,
+    val todayMinutesRead: Float = 0.0f
 )
 
 @Entity(tableName = "categories")
@@ -54,7 +56,8 @@ data class BookEntity(
     val seoUrl: String = "",
     val metaTitle: String = "",
     val metaDescription: String = "",
-    val tags: String = ""
+    val tags: String = "",
+    val fileFormat: String = "EPUB" // EPUB, PDF, ARTICLE
 )
 
 @Entity(tableName = "bookmarks")
@@ -103,7 +106,8 @@ data class NotificationEntity(
     val title: String,
     val message: String,
     val timestamp: Long = System.currentTimeMillis(),
-    val isRead: Boolean = false
+    val isRead: Boolean = false,
+    val type: String = "SYSTEM"
 )
 
 @Entity(tableName = "book_requests")
@@ -146,3 +150,56 @@ data class AdBlockEntity(
     val clicks: Int = 0,
     val impressions: Int = 0
 )
+
+@Entity(tableName = "forum_posts")
+data class PostEntity(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val title: String,
+    val content: String,
+    val type: String = "TEXT", // TEXT, IMAGE, DISCUSSION, TIPS, ANNOUNCEMENT
+    val authorName: String,
+    val authorEmail: String,
+    val authorAvatar: String = "avatar_default",
+    val imageUrl: String = "",
+    val bookTitleRef: String = "",
+    val likesCount: Int = 0,
+    val commentsCount: Int = 0,
+    val timestamp: Long = System.currentTimeMillis(),
+    val isLiked: Boolean = false,
+    val isSaved: Boolean = false,
+    val reportCount: Int = 0
+)
+
+@Entity(tableName = "forum_comments")
+data class CommentEntity(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val postId: Int,
+    val authorName: String,
+    val authorEmail: String,
+    val authorAvatar: String = "avatar_default",
+    val text: String,
+    val timestamp: Long = System.currentTimeMillis(),
+    val parentCommentId: Int = -1
+)
+
+@Entity(tableName = "words")
+data class WordEntity(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val word: String,
+    val definition: String = "",
+    val translation: String = "",
+    val pronunciation: String = "",
+    val bookTitle: String = "",
+    val sentenceContext: String = "",
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+@Entity(tableName = "ai_flashcards")
+data class FlashcardEntity(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val bookId: String,
+    val question: String,
+    val answer: String,
+    val timestamp: Long = System.currentTimeMillis()
+)
+

@@ -66,6 +66,9 @@ interface ReaderDao {
     @Query("SELECT * FROM bookmarks WHERE bookId = :bookId ORDER BY pageNumber ASC")
     fun getBookmarksForBook(bookId: String): Flow<List<BookmarkEntity>>
 
+    @Query("SELECT * FROM bookmarks ORDER BY timestamp DESC")
+    fun getAllBookmarks(): Flow<List<BookmarkEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertBookmark(bookmark: BookmarkEntity)
 
@@ -76,6 +79,9 @@ interface ReaderDao {
     @Query("SELECT * FROM reading_notes WHERE bookId = :bookId ORDER BY pageNumber ASC")
     fun getNotesForBook(bookId: String): Flow<List<NoteEntity>>
 
+    @Query("SELECT * FROM reading_notes ORDER BY timestamp DESC")
+    fun getAllNotes(): Flow<List<NoteEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertNote(note: NoteEntity)
 
@@ -85,6 +91,9 @@ interface ReaderDao {
     // History
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertHistory(history: HistoryEntity)
+
+    @Query("SELECT * FROM reading_history ORDER BY timestamp DESC")
+    fun getRawReadingHistory(): Flow<List<HistoryEntity>>
 
     @Query("DELETE FROM reading_history WHERE bookId = :bookId")
     suspend fun deleteHistoryForBook(bookId: String)
@@ -108,6 +117,9 @@ interface ReaderDao {
 
     @Query("UPDATE notifications SET isRead = 1 WHERE id = :id")
     suspend fun markNotificationAsRead(id: Int)
+
+    @Query("UPDATE notifications SET isRead = 1")
+    suspend fun markAllNotificationsAsRead()
 
     @Query("DELETE FROM notifications WHERE id = :id")
     suspend fun deleteNotificationById(id: Int)
@@ -147,4 +159,56 @@ interface ReaderDao {
 
     @Update
     suspend fun updateAdBlock(adBlock: AdBlockEntity)
+
+    // Forum Posts & Comments
+    @Query("SELECT * FROM forum_posts ORDER BY timestamp DESC")
+    fun getAllPosts(): Flow<List<PostEntity>>
+
+    @Query("SELECT * FROM forum_posts WHERE isSaved = 1 ORDER BY timestamp DESC")
+    fun getSavedPosts(): Flow<List<PostEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPost(post: PostEntity)
+
+    @Update
+    suspend fun updatePost(post: PostEntity)
+
+    @Delete
+    suspend fun deletePost(post: PostEntity)
+
+    @Query("SELECT * FROM forum_comments WHERE postId = :postId ORDER BY timestamp ASC")
+    fun getCommentsForPost(postId: Int): Flow<List<CommentEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertComment(comment: CommentEntity)
+
+    @Delete
+    suspend fun deleteComment(comment: CommentEntity)
+
+    @Query("SELECT * FROM forum_posts WHERE id = :id")
+    suspend fun getPostById(id: Int): PostEntity?
+
+    // Wordbook / Vocabulary Booklet
+    @Query("SELECT * FROM words ORDER BY timestamp DESC")
+    fun getAllWords(): Flow<List<WordEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertWord(word: WordEntity)
+
+    @Delete
+    suspend fun deleteWord(word: WordEntity)
+
+    // Flashcards / study materials
+    @Query("SELECT * FROM ai_flashcards WHERE bookId = :bookId ORDER BY timestamp DESC")
+    fun getFlashcardsForBook(bookId: String): Flow<List<FlashcardEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFlashcard(flashcard: FlashcardEntity)
+
+    @Delete
+    suspend fun deleteFlashcard(flashcard: FlashcardEntity)
+
+    @Query("DELETE FROM ai_flashcards WHERE bookId = :bookId")
+    suspend fun clearFlashcardsForBook(bookId: String)
 }
+
